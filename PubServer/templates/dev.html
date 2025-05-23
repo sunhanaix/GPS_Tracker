@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>定位器设备信息</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.bootcdn.net/ajax/libs/echarts/5.3.2/echarts.min.js"></script>
+    <style>
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+<div class="container py-4">
+    <div class="user-info">
+        <p class="mb-0">当前IMEI号: {{ session.user }}/{{ remark if remark is not none else '' }}</p>
+        <a href="{{home_url}}/logout">注销</a>
+        <a href="{{home_url}}/alert">设置</a>
+    </div>
+    <!-- 参数设置界面和设备状态并排显示 -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">设备状态</div>
+                <div class="card-body">
+                    <h5 id="update-time" class="card-title">--:--:--</h5>
+                    <div id="gps-status" class="alert alert-warning">GPS: 未定位</div>
+                    <ul class="list-group">
+                        <li class="list-group-item">温度: <span id="temp-value">--</span>℃</li>
+                        <li class="list-group-item">电量: <span id="vbat-value">--</span></li>
+                        <li class="list-group-item">预估总待机时间: <span id="total-standby-time">--</span>小时</li>
+                        <li class="list-group-item">预估剩余待机时间: <span id="remaining-standby-time">--</span>小时</li>
+                        <li class="list-group-item">AGPS经纬度:
+                            <a href="{{home_url}}" target="_blank"><span id="agps_lat">--</span>,
+                            <span id="agps_lng">--</span></a>
+                        </li>
+                        <li class="list-group-item">AGPS地址: <a href="{{home_url}}" target="_blank"><span id="agps_address">--</span></a></li>
+                        <li class="list-group-item">GPS经纬度:
+                            <span id="latitude">--</span>,
+                            <span id="longitude">--</span>
+                        </li>
+                        <li class="list-group-item">GPS地址: <span id="gps_address">--</span></li>
+                        <li class="list-group-item">uptime: <span id="uptime">--</span></li>
+
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">参数设置</div>
+                <div class="card-body">
+                    <button id="toggle-config-btn" class="btn btn-primary">展开配置</button>
+                    <button id="get-latest-config-btn" class="btn btn-secondary">最新配置</button>
+                    <button id="get-latest-location-btn" class="btn btn-info">最新位置</button>
+                    <button id="check-update-btn" class="btn btn-warning">更新固件</button>
+                    <!-- 新增电子围栏设置按钮 -->
+                    <a href="{{home_url}}/fence" target="_blank" class="btn btn-info">电子围栏设置</a>
+                    <div id="config-info" class="mt-3" style="display: none;">
+                        <h5>当前配置信息</h5>
+                        <pre id="config-data" class="bg-light p-3"></pre>
+                    </div>
+                    <form id="set-config-form" class="mt-3">
+                        <div class="mb-3">
+                            <label for="update-interval" class="form-label">更新间隔 (s)</label>
+                            <input type="number" class="form-control" id="update-interval" name="update_interval">
+                        </div>
+                        <div class="mb-3">
+                            <label for="feed-interval" class="form-label">喂狗间隔 (s)</label>
+                            <input type="number" class="form-control" id="feed-interval" name="feed_interval">
+                        </div>
+                        <div class="mb-3">
+                            <label for="power-mode" class="form-label">省电模式</label>
+                            <select class="form-select" id="power-mode" name="power_mode">
+                                <option value="0">正常模式</option>
+                                <option value="1">省电模式</option>
+                                <option value="2" disabled>极度省电模式（暂不支持）</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">设置参数</button>
+                        <button type="button" id="reboot-btn" class="btn btn-danger">重启设备</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- 实时数据展示 -->
+    <!-- 历史数据图表 -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>历史趋势</span>
+            <select id="time-range" class="form-select w-25">
+                <option value="1">最近1小时</option>
+                <option value="6">最近6小时</option>
+                <option value="24" selected>最近24小时</option>
+            </select>
+        </div>
+        <div class="card-body">
+            <div id="chart" style="height: 400px;"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 页面加载时获取配置参数
+    document.addEventListener('DOMContentLoaded', function() {
+        fetch('{{home_url}}/api/config/get')
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    const configData = JSON.parse(data.config);
+                    document.getElementById('config-data').textContent = JSON.stringify(configData, null, 2);
+                    // 填充更新间隔和喂狗间隔
+                    document.getElementById('update-interval').value = configData.mqtt.update_interval;
+                    document.getElementById('feed-interval').value = configData.wdt.feed_interval;
+                    document.getElementById('power-mode').value = configData.power_mode;
+                } else {
+                    alert('获取配置失败: ' + data.message);
+                }
+            });
+    });
+
+    // 展开配置按钮
+    document.getElementById('toggle-config-btn').addEventListener('click', function() {
+        const configInfo = document.getElementById('config-info');
+        if (configInfo.style.display === 'none') {
+            configInfo.style.display = 'block';
+            this.textContent = '收起配置';
+        } else {
+            configInfo.style.display = 'none';
+            this.textContent = '展开配置';
+        }
+    });
+
+    // 重启设备
+    document.getElementById('reboot-btn').addEventListener('click', function() {
+        fetch('{{home_url}}/api/config/set', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({"command": "reboot"})
+        }).then(res => res.json())
+          .then(data => {
+              alert('设备重启请求已发送');
+          });
+    });
+
+    // 获取最新配置
+    document.getElementById('get-latest-config-btn').addEventListener('click', function() {
+        fetch('{{home_url}}/api/config/get')
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    const configData = JSON.parse(data.config);
+                    document.getElementById('config-data').textContent = JSON.stringify(configData, null, 2);
+                    // 填充更新间隔和喂狗间隔
+                    document.getElementById('update-interval').value = configData.mqtt.update_interval;
+                    document.getElementById('feed-interval').value = configData.wdt.feed_interval;
+                    alert('最新配置已获取');
+                } else {
+                    alert('获取配置失败: ' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('获取配置时发生错误: ' + error.message);
+            });
+    });
+
+    // 获取最新位置
+    document.getElementById('get-latest-location-btn').addEventListener('click', function() {
+        fetch('{{home_url}}/api/config/set', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({"command": "report_status"})
+        }).then(res => res.json())
+          .then(data => {
+              alert('获取最新位置请求已发送');
+          });
+    });
+
+    // 设置配置参数
+    document.getElementById('set-config-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        const config = {};
+        formData.forEach((value, key) => {
+            config[key] = value;
+            //key是power_mode时，value强制取数值，非字符串
+            if (key === 'power_mode') {
+                config[key] = parseInt(value);
+            }
+        });
+        fetch('{{home_url}}/api/config/set', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(config)
+        }).then(res => res.json())
+          .then(data => {
+              if (data.status === 'success') {
+                  alert('配置参数已更新，设备将重启');
+              } else {
+                  alert('配置参数更新失败: ' + data.message);
+              }
+          })
+          .catch(error => {
+              alert('设置配置时发生错误: ' + error.message);
+          });
+    });
+
+    // 检测更新按钮
+    document.getElementById('check-update-btn').addEventListener('click', function() {
+        // 获取当前设备的微码版本
+        const configData = JSON.parse(document.getElementById('config-data').textContent);
+        const currentVersion = configData.version;
+        console.log('当前设备微码版本:', currentVersion)
+
+        // 获取最新固件版本
+        fetch('{{home_url}}/api/firmware/latest')
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    const latestVersion = data.version;
+                    console.log('最新固件版本:', latestVersion)
+                    if (latestVersion > currentVersion) {
+                        if (confirm(`当前微码 ${currentVersion}，最新微码 ${latestVersion}，是否升级？`)) {
+                            // 用户确认升级，调用API更新微码
+                            fetch('{{home_url}}/api/config/set', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({
+                                    "command": "update_firmware",
+                                    "value": latestVersion
+                                })
+                            }).then(res => res.json())
+                              .then(response => {
+                                  if (response.status === 'success') {
+                                      alert('微码更新请求已发送，请等待设备更新后重启');
+                                  } else {
+                                      alert('微码更新失败: ' + response.message);
+                                  }
+                              });
+                        }
+                    } else {
+                        alert('已是最新版本，无需升级');
+                    }
+                } else {
+                    alert('获取最新固件信息失败: ' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('检测更新时发生错误: ' + error.message);
+            });
+    });
+
+
+// 初始化ECharts
+const chart = echarts.init(document.getElementById('chart'));
+const chartOption = {
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['温度', '电量'] },
+    xAxis: { type: 'category' },
+    yAxis: [{ type: 'value', name: '温度(℃)' },
+           { type: 'value', name: '电量(mV)' }],
+    series: [
+        { name: '温度', type: 'line', yAxisIndex: 0, lineStyle: { color: '#5470C6' } },
+        { name: '电量', type: 'line', yAxisIndex: 1, lineStyle: { color: '#EE6666' } }
+    ]
+};
+
+// 实时更新函数
+function updateRealtimeData() {
+    fetch('{{home_url}}/api/data/realtime')
+        .then(res => res.json())
+        .then(data => {
+            const tempValue = data.temp ? (data.temp/1000).toFixed(1) : '--';
+            const vbatValue = data.vbat || '--';
+            const timestamp = data.timestamp || '--';
+            const uptime = data.uptime || '--';
+            const up_vbat=data.up_vbat || '--';
+
+            // 调用API获取电池电量百分比
+            fetch(`{{home_url}}/api/battery/estimate?voltage=${data.vbat}`)
+                .then(res => res.json())
+                .then(batteryData => {
+                    if (batteryData.status === 'success') {
+                        const battery_percentage = batteryData.battery_percentage;
+                        document.getElementById('vbat-value').textContent = vbatValue+'mV('+battery_percentage+'%)';
+                    } else {
+                        document.getElementById('vbat-value').textContent = vbatValue+'mV(--)';
+                    }
+                });
+
+            document.getElementById('temp-value').textContent = tempValue;
+            document.getElementById('update-time').textContent = timestamp;
+            document.getElementById('latitude').textContent = data.location.lat;
+            document.getElementById('longitude').textContent = data.location.lng;
+            document.getElementById('agps_lat').textContent = data.location.agps_lat;
+            document.getElementById('agps_lng').textContent = data.location.agps_lng;
+            document.getElementById('uptime').textContent = uptime;
+
+            // 调用API获取剩余时间
+            fetch(`{{home_url}}/api/battery/estimate?voltage=${data.vbat}`)
+                .then(res => res.json())
+                .then(batteryData => {
+                    if (batteryData.status === 'success') {
+                        // 计算总待机时间，假设初始电压为 up_vbat
+                        fetch(`{{home_url}}/api/battery/estimate?voltage=${data.up_vbat}`)
+                            .then(res => res.json())
+                            .then(totalBatteryData => {
+                                if (totalBatteryData.status === 'success') {
+                                    document.getElementById('total-standby-time').textContent = totalBatteryData.remaining_time_minutes.toFixed(2);
+                                } else {
+                                    document.getElementById('total-standby-time').textContent = '--';
+                                }
+                            });
+                        document.getElementById('remaining-standby-time').textContent = batteryData.remaining_time_minutes.toFixed(2);
+                    } else {
+                        document.getElementById('total-standby-time').textContent = '--';
+                        document.getElementById('remaining-standby-time').textContent = '--';
+                    }
+                });
+
+            // GPS状态判断
+            const hasValidGPS = data.location && data.location.lat !== 0;
+            const gpsStatus = data.location.lat !== 0 ?
+                `<span class="text-success">已定位</span>` :
+                `<span class="text-danger">未定位</span>`;
+            document.getElementById('gps-status').innerHTML = `GPS状态: ${gpsStatus}`;
+
+            // 获取AGPS地址
+            if (data.location.agps_lat !== 0 && data.location.agps_lng !== 0) {
+                fetch(`{{home_url}}/api/address/get?lat=${data.location.agps_lat}&lng=${data.location.agps_lng}`)
+                    .then(res => res.json())
+                    .then(addressData => {
+                        document.getElementById('agps_address').textContent = addressData.address;
+                    });
+            } else {
+                document.getElementById('agps_address').textContent = '--';
+            }
+
+            // 获取GPS地址
+            if (data.location.lat !== 0 && data.location.lng !== 0) {
+                fetch(`{{home_url}}/api/address/get?lat=${data.location.lat}&lng=${data.location.lng}`)
+                    .then(res => res.json())
+                    .then(addressData => {
+                        document.getElementById('gps_address').textContent = addressData.address;
+                    });
+            } else {
+                document.getElementById('gps_address').textContent = '--';
+            }
+        });
+}
+
+// 图表更新函数
+function updateChart(hours) {
+    fetch(`{{home_url}}/api/data/history?hours=${hours}`)
+        .then(res => res.json())
+        .then(data => {
+            const times = data.map(d => d.time);
+            const temps = data.map(d => d.temp/1000);
+            const vbats = data.map(d => d.vbat);
+
+            chartOption.xAxis.data = times;
+            chartOption.series[0].data = temps;
+            chartOption.series[1].data = vbats;
+            chart.setOption(chartOption);
+        });
+}
+
+// 初始化交互
+document.getElementById('time-range').addEventListener('change', function() {
+    updateChart(this.value);
+});
+
+// 定时刷新
+setInterval(() => {
+    updateRealtimeData();
+    updateChart(document.getElementById('time-range').value);
+}, 5000);
+
+// 首次加载
+updateRealtimeData();
+updateChart(24);
+</script>
+</body>
+</html>

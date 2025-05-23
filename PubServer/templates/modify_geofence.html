@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>修改电子围栏</title>
+    <script src="https://api.map.baidu.com/api?v=3.0&ak={{ baidu_ak }}"></script>
+    <style>
+        #map-container {
+            width: 100%;
+            height: 400px;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    <h1>{{ '修改电子围栏' if geofence else '添加电子围栏' }}</h1>
+    <div id="map-container"></div>
+    <form id="geofence-form">
+        <input type="hidden" id="id" name="id" value="{{ geofence.id if geofence else '' }}">
+        <div class="form-group">
+            <label for="address">地址:</label>
+            <input type="text" id="address" name="address" value="{{ geofence.address if geofence else '' }}" required>
+            <button type="button" id="search-address-btn">搜索地址</button>
+        </div>
+        <div class="form-group">
+            <label for="latitude">纬度:</label>
+            <input type="text" id="latitude" name="latitude" value="{{ geofence.lat if geofence else '' }}" readonly>
+        </div>
+        <div class="form-group">
+            <label for="longitude">经度:</label>
+            <input type="text" id="longitude" name="longitude" value="{{ geofence.lng if geofence else '' }}" readonly>
+        </div>
+        <div class="form-group">
+            <label for="radius">半径 (米):</label>
+            <input type="number" id="radius" name="radius" value="{{ geofence.radius if geofence else 300 }}" required>
+        </div>
+        <button type="submit">提交</button>
+    </form>
+
+    <script>
+        var map = new BMap.Map("map-container");
+        var defaultLng = {{ geofence.lng if geofence else 116.404 }};
+        var defaultLat = {{ geofence.lat if geofence else 39.915 }};
+        var defaultradius = {{ geofence.radius if geofence else 300 }};
+        map.centerAndZoom(new BMap.Point(defaultLng, defaultLat), 15);
+        map.enableScrollWheelZoom(true);
+
+        var marker = null;
+        var circle = null;
+
+        if ({{ 'true' if geofence else 'false' }}) {
+            marker = new BMap.Marker(new BMap.Point(defaultLng, defaultLat));
+            map.addOverlay(marker);
+
+            circle = new BMap.Circle(new BMap.Point(defaultLng, defaultLat), defaultradius, {
+                strokeColor: "blue",
+                strokeWeight: 2,
+                strokeOpacity: 0.5,
+                fillColor: "blue",
+                fillOpacity: 0.2
+            });
+            map.addOverlay(circle);
+        }
+
+        map.addEventListener("click", function(e) {
+            if (marker) {
+                map.removeOverlay(marker);
+            }
+            if (circle) {
+                map.removeOverlay(circle);
+            }
+            marker = new BMap.Marker(e.point);
+            map.addOverlay(marker);
+            var point = new BMap.Point(e.point.lng, e.point.lat);
+            map.centerAndZoom(point, 18);
+            var radius = parseFloat(document.getElementById("radius").value);
+            circle = new BMap.Circle(e.point, radius, {
+                strokeColor: "blue",
+                strokeWeight: 2,
+                strokeOpacity: 0.5,
+                fillColor: "blue",
+                fillOpacity: 0.2
+            });
+            map.addOverlay(circle);
+
+            document.getElementById("latitude").value = e.point.lat;
+            document.getElementById("longitude").value = e.point.lng;
+
+            var geoc = new BMap.Geocoder();
+            geoc.getLocation(e.point, function(rs) {
+                if (rs.surroundingPois && rs.surroundingPois.length > 0) {
+                    document.getElementById("address").value = rs.surroundingPois[0].title;
+                } else {
+                    document.getElementById("address").value = rs.address;
+                }
+            });
+        });
+
+        document.getElementById("radius").addEventListener("input", function() {
+            if (circle) {
+                var radius = parseFloat(this.value);
+                circle.setRadius(radius);
+            }
+        });
+
+        document.getElementById("search-address-btn").addEventListener("click", function() {
+            var address = document.getElementById("address").value;
+            if (address) {
+                var geoc = new BMap.Geocoder();
+                geoc.getPoint(address, function(point) {
+                    if (point) {
+                        map.centerAndZoom(point, 18);
+                        if (marker) {
+                            map.removeOverlay(marker);
+                        }
+                        if (circle) {
+                            map.removeOverlay(circle);
+                        }
+                        marker = new BMap.Marker(point);
+                        map.addOverlay(marker);
+
+                        var radius = parseFloat(document.getElementById("radius").value);
+                        circle = new BMap.Circle(point, radius, {
+                            strokeColor: "blue",
+                            strokeWeight: 2,
+                            strokeOpacity: 0.5,
+                            fillColor: "blue",
+                            fillOpacity: 0.2
+                        });
+                        map.addOverlay(circle);
+
+                        document.getElementById("latitude").value = point.lat;
+                        document.getElementById("longitude").value = point.lng;
+                    } else {
+                        alert("无法找到该地址");
+                    }
+                }, "北京市");
+            } else {
+                alert("请输入地址");
+            }
+        });
+
+        document.getElementById("geofence-form").addEventListener("submit", function(e) {
+            e.preventDefault();
+            var formData = {
+                id: document.getElementById("id").value,
+                lat: marker ? marker.getPosition().lat : 0,
+                lng: marker ? marker.getPosition().lng : 0,
+                radius: document.getElementById("radius").value,
+                address: document.getElementById("address").value,
+            };
+
+            var url = "{{home_url}}/api/geofence/{{ 'update' if geofence else 'add' }}";
+            fetch(url, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(formData)
+            }).then(response => {
+                if (response.ok) {
+                    window.location.href = "{{home_url}}/fence";
+                }
+            });
+        });
+    </script>
+</body>
+</html>

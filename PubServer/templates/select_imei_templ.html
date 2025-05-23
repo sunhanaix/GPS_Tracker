@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>选择IMEI登录</title>
+</head>
+<body>
+    <h1>该手机号对应多个IMEI，请选择以哪个IMEI登录</h1>
+    <form action="{{ home_url }}/select_imei" method="post">
+        {% for user in users %}
+        <div>
+            <input type="radio" name="imei" value="{{ user.imei }}" id="imei_{{ user.imei }}" onchange="this.form.submit()">
+            <label for="imei_{{ user.imei }}">{{ user.imei }}/{{ user.remark if user.remark is not none else '' }}</label>
+        </div>
+        {% endfor %}
+        <div>
+            <input type="hidden" name="password" id="password" value="{{ password }}">
+        </div>
+    </form>
+</body>
+</html>

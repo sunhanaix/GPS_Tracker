@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>电子围栏管理</title>
+    <script src="https://api.map.baidu.com/api?v=3.0&ak={{ baidu_ak }}"></script>
+    <style>
+        #map-container {
+            width: 100%;
+            height: 400px;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <h1>电子围栏管理</h1>
+    <div id="map-container"></div>
+    <h2>电子围栏列表</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>地址</th>
+                <th>经度（BD09）</th>
+                <th>纬度(BD09)</th>
+                <th>半径 (米)</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for fence in geofences %}
+            <tr onclick="focusOnFence({{ fence.lng }}, {{ fence.lat }})">
+                <td>{{ fence.id }}</td>
+                <td>{{ fence.address }}</td>
+                <td>{{ fence.lng }}</td>
+                <td>{{ fence.lat }}</td>
+                <td>{{ fence.radius }}</td>
+                <td>
+                    <button onclick="editFence({{ fence.id }})">编辑</button>
+                    <button onclick="deleteFence({{ fence.id }})">删除</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <button onclick="addFence()">添加电子围栏</button>
+    <button onclick="overviewFences()">概览</button>
+    <button onclick="window.location.href='{{home_url}}/alert'">告警设置</button>
+
+    <script>
+        var map = new BMap.Map("map-container");
+        var points = [];
+        var geofences= {{ geofences|safe }};
+        {% for fence in geofences %}
+        var point = new BMap.Point({{ fence.lng }}, {{ fence.lat }});
+        points.push(point);
+        var circle = new BMap.Circle(point, {{ fence.radius }}, {
+            strokeColor: "blue",
+            strokeWeight: 2,
+            strokeOpacity: 0.5
+        });
+        map.addOverlay(circle);
+
+        // 创建Marker并设置图标
+        var myIcon = new BMap.Icon("{{ static_url }}/img/marker.png", new BMap.Size(32, 32));
+        var marker = new BMap.Marker(point, {icon: myIcon});
+        map.addOverlay(marker);
+
+        // 添加ID标签
+        var label = new BMap.Label("{{ fence.id }}", {
+            offset: new BMap.Size(15, -10) // 设置标签偏移量
+        });
+        marker.setLabel(label);
+        {% endfor %}
+
+        if (points.length === 1) {
+            map.centerAndZoom(points[0], 18);
+        } else if (points.length > 1) {
+            var bounds = new BMap.Bounds();
+            for (var i = 0; i < points.length; i++) {
+                bounds.extend(points[i]);
+            }
+            var viewport = map.getViewport(bounds);
+            map.centerAndZoom(viewport.center, viewport.zoom);
+        } else {
+            map.centerAndZoom(new BMap.Point(116.404, 39.915), 11);
+        }
+        map.enableScrollWheelZoom(true);
+
+        function focusOnFence(lng, lat) {
+            var point = new BMap.Point(lng, lat);
+            map.centerAndZoom(point, 18);
+        }
+
+        function addFence() {
+            // 跳转到添加电子围栏页面
+            window.location.href = "{{home_url}}/add_geofence";
+        }
+
+        function editFence(id) {
+            // 跳转到编辑电子围栏页面
+            window.location.href = "{{home_url}}/edit_geofence?id=" + id;
+        }
+
+        function deleteFence(id) {
+            if (confirm("确定要删除这个电子围栏吗？")) {
+                fetch("{{home_url}}/api/geofence/delete", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ id: id })
+                }).then(response => {
+                    if (response.ok) {
+                        location.reload();
+                    }
+                });
+            }
+        }
+
+        function overviewFences() {
+            if (points.length > 0) {
+                var bounds = new BMap.Bounds();
+                for (var i = 0; i < points.length; i++) {
+                    bounds.extend(points[i]);
+                }
+                var viewport = map.getViewport(bounds);
+                map.centerAndZoom(viewport.center, viewport.zoom);
+            }
+        }
+    </script>
+</body>
+</html>

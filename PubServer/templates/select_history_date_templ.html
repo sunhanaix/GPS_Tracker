@@ -1,0 +1,85 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>历史轨迹</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1  maximum-scale=1 user-scalable=no">
+	<meta name="mobile-web-app-capable" content="yes">
+	<meta name="HandheldFriendly" content="True">
+	<meta http-equiv="Expires" content="0">
+
+        <link rel="stylesheet" href="{{static_url}}/css/font-awesome.min.css">
+        <link rel="stylesheet" href="{{static_url}}/css/materialize.min.css">
+        <link rel="stylesheet" href="{{static_url}}/css/slick.css">
+        <link rel="stylesheet" href="{{static_url}}/css/slick-theme.css">
+        <link rel="stylesheet" href="{{static_url}}/css/owl.carousel.css">
+        <link rel="stylesheet" href="{{static_url}}/css/owl.theme.css">
+        <link rel="stylesheet" href="{{static_url}}/css/owl.transitions.css">
+         <link rel="stylesheet" href="{{static_url}}/css/lightbox.min.css">
+        <link rel="stylesheet" href="{{static_url}}/css/style.css">
+</head>
+<body>
+
+	<!-- navbar -->
+    <div class="navbar">
+        <div class="container">
+            <div class="site-title">
+				<h1><i class="fa fa-star"></i>历史轨迹for {{ session.user }}/{{ remark }}</h1>
+            </div>
+        </div>
+	</div>
+	<!-- end navbar -->
+
+	
+	<!-- login-->
+        <div class="login app-pages app-section">
+                <div class="container">
+                        <div class="entry">
+                            <form action="#" method="get" id="hfrm" enctype="multipart/form-data" target="_blank">
+                    起始时间：<input name="start_time" type="datetime-local" id="start_time" value="" placeholder="起始时间" /><p/>
+					结束时间：<input name="end_time" type="datetime-local" id="end_time" value="" placeholder="结束时间" /><p/>
+					<input name="record" value="1" hidden="hidden"/>
+					<button class="button" id="Do" onclick="return false;">查询历史轨迹</button><p/>
+				</form>
+                        </div>
+                </div>
+	</div>
+
+	<script src="{{static_url}}/js/jquery.min.js"></script>
+<script>
+	function adjustIframe(){
+		var ifm= document.getElementById("map_frame");
+		ifm.height=document.documentElement.clientHeight;
+		ifm.width=document.documentElement.clientWidth;
+	}
+	var hfrm=document.getElementById("hfrm");
+    $("#Do").click( function (event) { //点了“提交记录”按钮时
+		if(!hfrm.elements['start_time'].value){
+		    alert("起始时间不能为空！");
+			hfrm.elements['start_time'].focus();
+			return false;
+		}
+		if(!hfrm.elements['end_time'].value){
+		    alert("结束时间不能为空！");
+			hfrm.elements['end_time'].focus();
+			return false;
+		}
+        hfrm.elements['record'].value=1
+		hfrm.submit()
+		hfrm.elements['record'].value=0
+        //$.post('/',{parallel:$("#parallel").val()})
+    });
+	function fillDateTime(){ //计算当前的日期时间
+	      var currentDate = new Date();
+		  // 格式化日期和时间为所需的字符串格式
+		  var currentDateString = currentDate.toISOString().slice(0, 10);
+		  var startTimeString = currentDateString + "T00:00";
+		  var endTimeString = currentDateString + "T23:59"
+		  // 将起始时间和结束时间的值设置为所需的字符串格式
+		  document.getElementById("start_time").value = startTimeString;
+		  document.getElementById("end_time").value = endTimeString;
+	}
+	fillDateTime(); //把5天前的日期，填充到form中
+</script>
+</body>
+</html>

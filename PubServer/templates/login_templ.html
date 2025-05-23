@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>请登录</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1  maximum-scale=1 user-scalable=no">
+	<meta name="mobile-web-app-capable" content="yes">
+	<meta name="HandheldFriendly" content="True">
+	
+	<link rel="shortcut icon" href="{{static_url}}/img/favicon.png">
+	
+	<link rel="stylesheet" href="{{static_url}}/css/font-awesome.min.css">
+	<link rel="stylesheet" href="{{static_url}}/css/materialize.min.css">
+	<link rel="stylesheet" href="{{static_url}}/css/slick.css">
+	<link rel="stylesheet" href="{{static_url}}/css/slick-theme.css">
+	<link rel="stylesheet" href="{{static_url}}/css/owl.carousel.css">
+	<link rel="stylesheet" href="{{static_url}}/css/owl.theme.css">
+	<link rel="stylesheet" href="{{static_url}}/css/owl.transitions.css">
+	<link rel="stylesheet" href="{{static_url}}/css/lightbox.min.css">
+	<link rel="stylesheet" href="{{static_url}}/css/style.css">
+</head>
+<body>
+
+	<!-- navbar -->
+	<div class="navbar">
+		<div class="container">
+			<div class="panel-control-right">
+				<a href="#" data-activates="slide-out-right" class="sidenav-control-right"><i class="fa fa-bars"></i></a>
+			</div>
+			<div class="site-title">
+				<a href="/fdapp"><h1><i class="fa fa-star"></i>{{prompt}}</h1></a>
+			</div>
+		</div>
+	</div>
+	<!-- end navbar -->
+
+	
+	<!-- login-->
+	<div class="login app-pages app-section">
+		<div class="container">
+			<div class="pages-title">
+				<h3>Login</h3>
+			</div>
+			<form action="#" method="post">
+				<input name="username" type="text" placeholder="用户名" value="{{ request.args.get('imei', '') }}">
+				<input name="password" type="password" placeholder="密码">
+				<button class="button">登录</button>
+				<button type="button" onclick="scanNearby()" class="button">扫描附近定位器</button>
+				<div id="imeiSelection" style="display: none">
+                    <span>请选择一个IMEI</span>
+                    <div id="imeiRadioGroup"></div>
+                </div>
+                <script>
+                    function scanNearby() {
+                        // 获取当前手机位置
+                        if (navigator.geolocation) {
+                            navigator.geolocation.getCurrentPosition(
+                                function(position) {
+                                    const phone_lat = position.coords.latitude;
+                                    const phone_lng = position.coords.longitude;
+
+                                    // 发起请求
+                                    fetch(`{{home_url}}/api/locate/nearby?phone_lat=${phone_lat}&phone_lng=${phone_lng}`)
+                                        .then(response => response.json())
+                                        .then(data => {
+                                            console.log(data);
+                                            if (data.length === 0) {
+                                                alert('附近没有发现需要注册的定位器');
+                                                return;
+                                            }
+
+                                            // 当结果集为多个时，显示 radio 按钮让用户选择
+                                            if (data.length > 1) {
+                                                // 显示IMEI选择框
+                                                alert('在附近发现了不止一个定位器，点击选择一个后，点击登录按钮');
+                                                document.getElementById('imeiSelection').style.display = 'block';
+                                                const imeiRadioGroup = document.getElementById('imeiRadioGroup');
+                                                imeiRadioGroup.innerHTML = '';
+                                                data.forEach(imei => {
+                                                    const radioId = 'imeiRadio_' + imei;
+                                                    const div = document.createElement('div');
+                                                    div.innerHTML = `
+                                                        <input type="radio" id="${radioId}" name="selectIMEI" value="${imei}" onclick="SelectIMEI('${imei}')">
+                                                        <label for="${radioId}">${imei}</label>
+                                                    `;
+                                                    imeiRadioGroup.appendChild(div);
+                                                });
+                                                return;
+                                            }
+                                            alert('在附近发现了imei='+data[0]+'的定位器，点击确定后登录');
+                                            // 自动填写用户名和密码
+                                            document.getElementsByName('username')[0].value = data[0];
+                                            document.getElementsByName('password')[0].value = '{{default_password}}';
+                                        })
+                                        .catch(error => console.error('Error:', error));
+                                },
+                                function(error) {
+                                    alert('无法获取当前位置，请手动输入坐标');
+                                }
+                            );
+                        } else {
+                            alert('浏览器不支持地理定位');
+                        }
+                    }
+
+                    function SelectIMEI(imei) {
+                        // 填写用户名和密码
+                        document.getElementsByName('username')[0].value = imei;
+                        document.getElementsByName('password')[0].value = '88888888';
+                        // 隐藏IMEI选择框
+                        document.getElementById('imeiSelection').style.display = 'none';
+                    }
+                </script>
+                <div id="imeiSelection"></div>
+			</form>
+		</div>
+	</div>
+	<!-- end login -->
+	
+<!-- footer -->
+<footer>
+    <div class="container">
+        <li><i class="fa fa-home"></i><a href="{{home_url}}"></a></li>
+        <div class="ft-bottom">
+            <span>Copyright © 2020 All Rights <a href="http://www.sunbeatus.com/">sunbeatus</a> </span>
+        </div>
+    </div>
+</footer>
+<!-- end footer -->
+	
+	<!-- script -->
+	<script src="{{static_url}}/js/jquery.min.js"></script>
+	<script src="{{static_url}}/js/materialize.min.js"></script>
+	<script src="{{static_url}}/js/slick.min.js"></script>
+	<script src="{{static_url}}/js/owl.carousel.min.js"></script>
+	<script src="{{static_url}}/js/custom.js"></script>
+
+</body>
+</html>

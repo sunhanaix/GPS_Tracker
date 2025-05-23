@@ -1,0 +1,35 @@
+<html><head><title>地图定位</title></head>
+<body>
+<script type="text/javascript" src="https://api.map.baidu.com/api?v=2.0&ak=IPHDEesBVxQaVxbH1G6SWwokD2K7wZeT"></script>
+<div id="mapContainer" style="width: 100%; height: 500px;"></div>
+<script> 
+var phonePoint;
+if (navigator.geolocation) {
+  navigator.geolocation.getCurrentPosition(function(position) {
+    var longitude = position.coords.longitude; // 经度
+    var latitude = position.coords.latitude; // 纬度
+    // 转换WGS-84坐标为BD09坐标
+    var convertor = new BMap.Convertor();
+    var point = new BMap.Point(longitude, latitude);
+    phonePoint=new BMap.Point(longitude, latitude);
+    var pointArr = [];
+    pointArr.push(point);
+    convertor.translate(pointArr, 1, 5, function(data){
+      if (data.status === 0) {
+        var bdPoint = data.points[0]; // 转换后的BD09坐标
+        var map = new BMap.Map("mapContainer"); // 创建地图实例
+        map.centerAndZoom(bdPoint, 15); // 将地图中心设置为转换后的坐标，并缩放级别为15
+        var marker = new BMap.Marker(bdPoint); // 创建标注
+        map.addOverlay(marker); // 将标注添加到地图中
+        marker.setAnimation(BMAP_ANIMATION_BOUNCE); // 添加标注的动画效果
+      } else {
+        alert("坐标转换失败！");
+      }
+    });
+  });
+} else {
+  alert("您的浏览器不支持定位功能！");
+}
+</script> 
+</body>
+</html>

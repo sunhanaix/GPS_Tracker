@@ -1,0 +1,569 @@
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>地点</title>
+    <base href="https://api.map.baidu.com/" />
+    <script src="https://api.map.baidu.com/api?v=2.0&ak={{baidu_ak}}"></script>
+    <script src="https://api.map.baidu.com/library/DistanceTool/1.2/src/DistanceTool_min.js"></script>
+  <style type="text/css">
+    #navigationButton, #hisButton, #distanceButton, #shareButton, #deviceInfoButton, #refreshButton, #getLatestLocationButton {
+        position: absolute;
+        z-index: 1000;
+        background-color: #007bff;
+        color: #fff;
+        border: none;
+        padding: 13px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 1.5vw; /* 使用视口宽度单位，使字体大小随屏幕缩放 */
+    }
+    #batteryStatus {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        z-index: 1000;
+        background-color: #007bff;
+        color: #fff;
+        border: none;
+        padding: 13px;
+        border-radius: 5px;
+        font-size: 1.5vw;
+        display: none; /* 新增：默认隐藏 */
+    }
+    #distanceButton {
+        top: 10px;
+        left: 80px;
+        font-size: 2vw;
+    }
+    #refreshButton {
+        top: 10px;
+        left: 190px;
+        font-size: 2vw;
+    }
+    #countdown {
+        display: inline-block;
+        margin-left: 0px;
+        font-size: 1.5vw; /* 调整倒数计时器的字体大小 */
+    }
+    #getLatestLocationButton {
+        top: 10px;
+        left: 380px;
+        font-size: 2vw;
+    }
+    #hisButton {
+        top: 10px;
+        left: 55%;
+        transform: translateX(-50%);
+        font-size: 2.8vw; /* 调整历史轨迹按钮的字体大小 */
+    }
+    #deviceInfoButton {
+        top: 10px;
+        right: 260px;
+        font-size: 2vw;
+    }
+    #navigationButton {
+        top: 10px;
+        right: 140px;
+        font-size: 2vw;
+    }
+    #shareButton {
+        top: 10px;
+        right: 30px;
+        font-size: 2vw;
+    }
+
+    .BMapLabel {
+        font-size: 1.8vw !important; /* 调整地图上label的字体大小 */
+    }
+    /* 新增样式 */
+    #navigationModal, #shareModal {
+        font-size: 2vw; /* 调整导航和分享提示菜单的字体大小 */
+    }
+    #navigationModal button {
+        font-size: 2vw; /* 调整导航按钮的字体大小 */
+    }
+    #shareModal button {
+        font-size: 2vw; /* 调整分享按钮的字体大小 */
+    }
+    /* 新增样式 */
+    #customButtons {
+        position: absolute;
+        bottom: 70px; /* 修改：从 40px 调整为 70px，向上移动 30 像素 */
+        left: 10px;
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+    .customButton {
+        background-color: #fff;
+        border: none;
+        padding: 15px;
+        border-radius: 5px;
+        cursor: pointer;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    .customButton img {
+        width: 48px;
+        height: 48px;
+    }
+    /* 隐藏百度版权容器 */
+    .BMap_cpyCtrl, .anchorBL {
+        display: none !important;
+    }
+
+    /* 隐藏百度水印层（适用于部分版本） */
+    .BMap_mask {
+        background-image: none !important;
+    }
+
+    @media (max-width: 768px) {
+      .btn-group button {
+        font-size: 12px; /* 调整字体大小 */
+        padding: 5px 10px; /* 调整内边距，使按钮更紧凑 */
+        width: auto; /* 自动宽度 */
+      }
+    }
+</style>
+  </head>
+
+  <body>
+  <div id="batteryStatus">{{battery_status}}%</div>
+  <div id="hisButton" onclick="hisTrack()">轨迹</div>
+  <button id="shareButton" onclick="showShareOptions()">分享</button>
+  <button id="deviceInfoButton" onclick="openDeviceInfo()">设备</button>
+  <button id="distanceButton">测距</button>
+  <button id="navigationButton" onclick="showNavigationMenu()">导航</button>
+  <button id="refreshButton" onclick="refreshPage()">地图 (<span id="countdown">{{ map_refresh_interval }}</span>)</button>
+  <button id="getLatestLocationButton" onclick="getLatestLocation()">即刻位置</button>
+  <div id="navigationModal" style="display:none; background-color:white; padding:20px; box-shadow:0 4px 8px rgba(0,0,0,0.1); z-index:1001;">
+    <p>请选择导航方式：</p>
+    <button onclick="navigateToBaidu(); closeNavigationModal();">百度导航</button>
+    <button onclick="navigateToGaode(); closeNavigationModal();">高德导航</button>
+  </div>
+  <div id="overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5); z-index:1000;"></div>
+  <div style="width:100%;height:100%;border:#ccc solid 1px;font-size:12px" id="map"></div>
+  <div id="shareModal" style="display:none; background-color:white; padding:20px; box-shadow:0 4px 8px rgba(0,0,0,0.1); z-index:1001;">
+    <p>请选择分享地图：</p>
+    <button onclick="shareLocationBaidu(); closeShareModal();">百度地图</button>
+    <button onclick="shareLocationGaode(); closeShareModal();">高德地图</button>
+</div>
+<div id="overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5); z-index:1000;"></div>
+  <div id="customButtons">
+        <button class="customButton" onclick="centerPhonePoint()">
+            <img src="{{ static_url }}/img/phone_location-org.png" alt="手机位置">
+        </button>
+        <button class="customButton" onclick="centerMap()">
+            <img src="{{ static_url }}/img/tracker_location-org.png" alt="定位器位置">
+        </button>
+    </div>
+  </body>
+  <script type="text/javascript">
+    // 创建和初始化地图函数：
+    lat={{lat}};  // WGS-84坐标
+    lng={{lng}};  // WGS-84坐标
+    txtLabel="{{battery_status}}%<br>GPS状态：{{gps_info}}<br>最近更新时间：{{update_time}}<br>定位地点：{{address}}";
+    var map,point,phonePoint,centerPoint,menu; //全局变量
+
+    // 修改：异步加载百度地图脚本
+    function loadBaiduMapScript(callback) {
+        const script = document.createElement('script');
+        script.src = 'https://api.map.baidu.com/api?v=2.0&ak={{baidu_ak}}&callback=initMap';
+        script.async = true;
+        document.head.appendChild(script);
+        window.initMap = callback;
+    }
+
+    // 新增：调用后端 API 进行坐标转换
+    function convertWgs84ToBd09(lat, lng, callback) {
+        // 修改：使用  构造查询参数
+        const params = new URLSearchParams({
+            lat: lat,
+            lng: lng
+        });
+        fetch("{{home_url}}/api/cvt/wgs84_to_bd09?" + params.toString(), {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json"
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data && data.status === "success") {
+                callback(data.bd_lat, data.bd_lng);
+            } else {
+                alert("坐标转换失败！");
+            }
+        })
+        .catch(error => {
+            console.error('坐标转换失败', error);
+            alert("坐标转换失败！");
+        });
+    }
+
+    // 新增：获取手机位置并显示在地图上
+    function getPhoneLocation() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                function (position) {
+                    var longitude = position.coords.longitude; // 经度
+                    var latitude = position.coords.latitude; // 纬度
+                    console.log("手机WGS84经度:", longitude);
+                    console.log("手机WGS84纬度:", latitude);
+                    convertWgs84ToBd09(latitude, longitude, function(bdLat, bdLng) {
+                        phonePoint = new BMap.Point(bdLng, bdLat);
+                        console.log("手机的百度经坐标:", phonePoint);
+                        addPhoneMarker(phonePoint);
+                        centerPoint = calculateCenterPoint(point, phonePoint);
+                        // 以手机位置为中心点，级别设置为15
+                        //map.centerAndZoom(phonePoint, 15);
+                        // 以定位器和手机位置中间为中心点，级别设置为15
+                        if (point && phonePoint) {
+                            var viewport = map.getViewport([point, phonePoint]);
+                            map.centerAndZoom(viewport.center, viewport.zoom);
+                        }
+                    });
+                },
+                function (error) {
+                    console.error("获取位置失败:", error);
+                    alert("无法获取当前位置！");
+                }
+            );
+        } else {
+            alert("您的浏览器不支持定位功能！");
+        }
+    }
+
+    // 修改：使用百度地图内置的图标样式
+    function addPhoneMarker(point) {
+        //百度对于自建图片做icon有要求，似乎只能png格式，然后像素大小不要大大
+        var icon = new BMap.Icon("{{ static_url }}/img/phone_location.png", new BMap.Size(32, 32));
+        var marker = new BMap.Marker(point, { icon: icon });
+        map.addOverlay(marker);
+    }
+
+    function initMap() {
+        convertWgs84ToBd09(lat, lng, function(bdLat, bdLng) {
+            point = new BMap.Point(bdLng, bdLat);
+            createMap(); // 创建地图
+            setMapEvent(); // 设置地图事件
+            addMapControl(); // 向地图添加控件
+            addMarker(point, txtLabel);
+            // 新增：获取手机位置并显示在地图上
+            getPhoneLocation();
+        });
+    }
+
+    function createMap(){
+      map = new BMap.Map("map");
+      map.centerAndZoom(point,25);
+    }
+    function setMapEvent() {
+        map.enableScrollWheelZoom();
+        map.enableKeyboard();
+        map.enableDragging();
+
+        // 修复右键菜单初始化问题
+        menu = new BMap.ContextMenu();
+        menu.addItem(new BMap.MenuItem("百度导航", function() {
+            console.log("使用百度导航到此处");
+            navigateToBaidu();
+        }));
+        menu.addItem(new BMap.MenuItem("高德导航", function() {
+            console.log("使用高德导航到此处");
+            navigateToGaode();
+        }));
+        map.addContextMenu(menu);
+
+        // 添加手机长按事件
+        var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        if (isMobile) {
+            var startTime, endTime;
+            map.addEventListener('touchstart', function(e) {
+                startTime = new Date().getTime();
+            });
+            map.addEventListener('touchend', function(e) {
+                endTime = new Date().getTime();
+                if (endTime - startTime > 500) { // 长按时间超过500ms
+                    var point = e.overlay ? e.overlay.getPosition() : map.pointToOverlayPixel(e.point);
+                    //showNavigationMenu();
+                    //menu.open(map, point); // 修复 menu.open 调用
+                }
+            });
+
+            // 添加地图缩放事件监听
+            map.addEventListener('zoomend', function() {
+                var zoomLevel = map.getZoom();
+                console.log("地图缩放级别变化:", zoomLevel);
+                // 根据缩放级别更新地图元素
+                updateMapElements(zoomLevel);
+            });
+        }
+    }
+
+    // 修改：调整地图缩放级别更新逻辑
+    function updateMapElements(zoomLevel) {
+        var labels = map.getOverlays();
+        for (var i = 0; i < labels.length; i++) {
+            if (labels[i] instanceof BMap.Label) {
+                var label = labels[i];
+                if (zoomLevel < 15) {
+                    label.hide();
+                } else {
+                    label.show();
+                }
+            }
+        }
+    }
+
+    //向地图添加控件
+    function addMapControl(){
+      var scaleControl = new BMap.ScaleControl({anchor:BMAP_ANCHOR_BOTTOM_LEFT});
+      scaleControl.setUnit(BMAP_UNIT_IMPERIAL);
+      map.addControl(scaleControl);
+      var navControl = new BMap.NavigationControl({anchor:BMAP_ANCHOR_TOP_LEFT,type:0});
+      map.addControl(navControl);
+      map.addControl(navControl);
+      // 添加测距控件
+      var distanceTool = new BMapLib.DistanceTool(map);
+      document.getElementById("distanceButton").addEventListener("click", function() {
+                  distanceTool.open();
+      });
+    }
+	function addMarker(point,txtLabel){
+    var marker = new BMap.Marker(point);
+    var label = new BMap.Label(txtLabel,{offset: new BMap.Size(25,5)});
+    var icon = new BMap.Icon("{{ static_url }}/img/tracker_location.png", new BMap.Size(32, 32));
+    marker.setIcon(icon);
+    marker.setLabel(label);
+    map.addOverlay(marker);
+	}
+
+    function hisTrack(){
+      window.open("{{home_url}}/his", "_blank");
+    }
+    function openDeviceInfo() {
+      window.open("{{home_url}}/dev", "_blank");
+    }
+
+    function showShareOptions() {
+        var shareButton = document.getElementById("shareButton");
+        var shareModal = document.getElementById("shareModal");
+        var rect = shareButton.getBoundingClientRect();
+        shareModal.style.display = "block";
+        shareModal.style.position = "absolute";
+        shareModal.style.top = (rect.bottom + 5) + "px";
+        shareModal.style.right = (window.innerWidth - rect.right) + "px";
+        document.getElementById("overlay").style.display = "block";
+    }
+
+    function closeShareModal() {
+        document.getElementById("shareModal").style.display = "none";
+        document.getElementById("overlay").style.display = "none";
+    }
+
+
+    function shareLocationBaidu() {
+        var shareUrl = "https://api.map.baidu.com/marker?location={{lat}},{{lng}}&title=%E7%9B%AE%E6%A0%87%E4%BD%8D%E7%BD%AE&content=" + encodeURIComponent("{{address}}") + "&output=html&coord_type=wgs84&src=wechat&navigation=1";
+        var shareText = "点击以下链接在百度地图中查看我的位置： ";
+        shortenUrl(shareUrl, function(shortUrl) {
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(shareText+shortUrl).then(function() {
+                    alert("链接已复制到剪贴板，请粘贴到微信中打开。");
+                }).catch(function(error) {
+                    console.error('复制链接失败', error);
+                    prompt("请手动复制以下链接分享:", shortUrl);
+                });
+            } else {
+                prompt("请手动复制以下链接分享:", shortUrl);
+            }
+        });
+    }
+
+    function shareLocationGaode() {
+        var shareUrl = "https://uri.amap.com/marker?position={{lng}},{{lat}}&name=" + encodeURIComponent("{{address}}") + "&coordinate=wgs84&src=wechat&callnative=1";
+        var shareText = "点击以下链接在高德地图中查看我的位置：" ;
+        shortenUrl(shareUrl, function(shortUrl) {
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(shareText+shortUrl).then(function() {
+                    alert("链接已复制到剪贴板，请粘贴到微信中打开。");
+                }).catch(function(error) {
+                    console.error('复制链接失败', error);
+                    prompt("请手动复制以下链接分享:", shortUrl);
+                });
+            } else {
+                prompt("请手动复制以下链接分享:", shortUrl);
+            }
+        });
+    }
+
+    // 生成短链接
+    function shortenUrl(longUrl, callback) {
+        // 调用后端API生成短链接
+        var apiUrl = "{{home_url}}/api/data/shortUrl";
+        fetch(apiUrl, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ long_url: longUrl })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data && data.status === "success") {
+                callback("{{ home_url }}/"+data.short_url); // 返回生成的短链接
+            } else {
+                callback(longUrl); // 如果生成失败，返回原链接
+            }
+        })
+        .catch(error => {
+            console.error('生成短链接失败', error);
+            callback(longUrl); // 如果发生错误，返回原链接
+        });
+    }
+
+    function showNavigationMenu() {
+        var navigationButton = document.getElementById("navigationButton");
+        var navigationModal = document.getElementById("navigationModal");
+        var rect = navigationButton.getBoundingClientRect();
+        navigationModal.style.display = "block";
+        navigationModal.style.position = "absolute";
+        navigationModal.style.top = (rect.bottom + 5) + "px";
+        navigationModal.style.right = (window.innerWidth - rect.right) + "px";
+        document.getElementById("overlay").style.display = "block";
+    }
+
+    function closeNavigationModal() {
+        document.getElementById("navigationModal").style.display = "none";
+        document.getElementById("overlay").style.display = "none";
+    }
+
+    document.getElementById("overlay").addEventListener("click", function() {
+        closeNavigationModal();
+        closeShareModal();
+    });
+
+    function navigateToBaidu() {
+        console.log("尝试启动跳转navigateToBaidu");
+        var navigateUrl = "https://api.map.baidu.com/marker?location={{lat}},{{lng}}&title=%E7%9B%AE%E6%A0%87%E4%BD%8D%E7%BD%AE&content=" + encodeURIComponent("{{address}}") + "&output=html&coord_type=wgs84&src=wechat&navigation=1";
+        window.open(navigateUrl, "_blank");
+    }
+    function navigateToGaode() {
+        console.log("尝试启动跳转navigateToGaode");
+        var navigateUrl = "https://uri.amap.com/marker?position={{lng}},{{lat}}&name=" + encodeURIComponent("{{address}}") + "&coordinate=wgs84&src=wechat&callnative=1";
+        window.open(navigateUrl, "_blank");
+    }
+
+    // 倒数计时器
+    var countdownElement = document.getElementById("countdown");
+    var countdownTime = {{map_refresh_interval}};
+
+    function startCountdown() {
+        countdownElement.textContent = countdownTime;
+        var countdownInterval = setInterval(function() {
+            countdownTime--;
+            countdownElement.textContent = countdownTime;
+            if (countdownTime <= 0) {
+                clearInterval(countdownInterval);
+                refreshPage();
+            }
+        }, 1000);
+    }
+
+    function refreshPage() {
+        window.location.reload();
+    }
+
+    // 启动倒数计时器
+    startCountdown();
+
+    // 获取最新位置
+    function getLatestLocation() {
+        fetch("{{home_url}}/api/config/set", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ command: "report_status" })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data && data.status === "success") {
+                // 假设返回的数据中包含当前位置和方向
+                var lat = data.latitude;
+                var lng = data.longitude;
+                var heading = data.heading;
+                alert('获取最新位置请求已发送，页面将在10秒后刷新');
+                setTimeout(() => {
+                  location.reload();
+              }, 10000);
+            } else {
+                alert("获取最新位置失败");
+            }
+        })
+        .catch(error => {
+            console.error('获取最新位置失败', error);
+            alert("获取最新位置失败");
+        });
+    }
+
+    // 新增函数：计算两个BD09坐标点之间的中间点
+    function calculateCenterPoint(point1, point2) {
+        if (!(point1 instanceof BMap.Point) || !(point2 instanceof BMap.Point)) {
+            throw new Error("输入参数必须是BMap.Point对象");
+        }
+        var lng = (point1.lng + point2.lng) / 2;
+        var lat = (point1.lat + point2.lat) / 2;
+        return new BMap.Point(lng, lat);
+    }
+
+    // 新增函数：将地图中心移动到当前点
+    function centerMap() {
+        map.panTo(point);
+        // 以定位器位置为中心点
+        map.centerAndZoom(point, 15);
+    }
+    function centerPhonePoint() {
+        map.panTo(phonePoint);
+        // 以定位器位置为中心点
+        map.centerAndZoom(phonePoint, 15);
+    }
+    // 获取电池电量百分比
+    function getBatteryPercentage() {
+        fetch("{{home_url}}/api/battery/estimate", {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json"
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data && data.status === "success") {
+                document.getElementById("batteryStatus").textContent = data.battery_percentage;
+            } else {
+                console.error('获取电池电量失败');
+            }
+        })
+        .catch(error => {
+            console.error('获取电池电量失败', error);
+        });
+    }
+
+    // 页面加载时获取电池电量
+    window.onload = function() {
+        getBatteryPercentage();
+    };
+
+    // 修改：初始化地图时异步加载百度地图脚本
+    loadBaiduMapScript(function() {
+        convertWgs84ToBd09(lat, lng, function(bdLat, bdLng) {
+            point = new BMap.Point(bdLng, bdLat);
+            createMap(); // 创建地图
+            setMapEvent(); // 设置地图事件
+            addMapControl(); // 向地图添加控件
+            addMarker(point, txtLabel);
+            getPhoneLocation(); // 获取手机位置并显示在地图上
+        });
+    });
+  </script>
+</html>

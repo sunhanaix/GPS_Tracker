@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>告警设置</title>
+    <style>
+        .form-container {
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: inline-block;
+            margin-right: 10px;
+        }
+        input[type="text"], input[type="email"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .btn {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+        }
+        /* 新增tooltip样式 */
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            cursor: help;
+        }
+        .tooltip .tooltip-text {
+            visibility: hidden;
+            width: 220px;
+            background: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 4px;
+            padding: 8px;
+            position: absolute;
+            z-index: 1;
+            /* 修改定位参数 */
+            top: 100%;  /* 显示在元素下方 */
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            /* 新增防止被遮挡的样式 */
+            white-space: normal; /* 允许换行 */
+            max-width: 220px;
+            word-break: break-all; /* 中文强制换行 */
+            /* 删除冲突的定位属性 */
+            /* 删除:bottom: 125%; */
+            /* 删除:top: -100px; */
+            /* 删除:margin-left: 50px; */
+        }
+        .tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+    <h1>设备信息设置</h1>
+        <span>{{ session.user }}</span>
+        <label for="remark">设备备注：</label>
+        <input type="text" id="remark" placeholder="请输入设备备注">
+    </div>
+    <div class="form-container">
+        <h1>告警设置</h1>
+        <div class="form-group">
+            <input type="checkbox" id="enable_notify_email" {{ 'checked' if alert_config.enable_notify_email else '' }} >
+            <label for="email">告警邮箱：</label>
+            <input type="email" id="email" placeholder="请输入告警邮箱">
+        </div>
+        <div class="form-group">
+            <input type="checkbox" id="enable_notify_phone" {{ 'checked' if alert_config.enable_notify_phone else '' }}>
+            <label for="phone">告警电话：</label>
+            <input type="text" id="phone" placeholder="请输入告警电话">
+        </div>
+        <div class="form-group">
+            <input type="checkbox" id="enable_xiatui" {{ 'checked' if alert_config.enable_xiatui else '' }}>
+            <label for="xiatui_key">虾推Key：</label>
+            <span class="tooltip">
+                <img src="{{ static_url }}/img/question.png" alt="?" style="width: 16px; height: 16px;">
+                <div class="tooltip-text">
+                    <img src="https://open.weixin.qq.com/qr/code?username=xtuis_push" style="max-width:200px;">
+                    <p>请先在微信中关注“虾推”公众号，然后发送“key”给“虾推”公众号，即可获取到key。</p>
+                </div>
+            </span>
+            <input type="text" id="xiatui_key" placeholder="请输入虾推Key">
+        </div>
+        <button class="btn" onclick="saveConfig()">保存设置</button>
+        <button class="btn" onclick="window.location.href='{{ home_url }}'">返回首页</button>
+    </div>
+
+    <script>
+        // 页面加载时获取当前配置
+        window.onload = function() {
+            fetch("{{ home_url }}/api/alert/get")
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === "success") {
+                        document.getElementById('remark').value = data.remark || '';
+                        document.getElementById('email').value = data.email || '';
+                        document.getElementById('phone').value = data.phone || '';
+                        document.getElementById('xiatui_key').value = data.xiatui_key || '';
+                        // 根据checkbox状态设置input的禁用状态
+                        toggleInputState('enable_notify_email', 'email');
+                        toggleInputState('enable_notify_phone', 'phone');
+                        toggleInputState('enable_xiatui', 'xiatui_key');
+                    }
+                });
+
+            // 添加checkbox的change事件监听器
+            document.getElementById('enable_notify_email').addEventListener('change', function() {
+                toggleInputState('enable_notify_email', 'email');
+            });
+            document.getElementById('enable_notify_phone').addEventListener('change', function() {
+                toggleInputState('enable_notify_phone', 'phone');
+            });
+            document.getElementById('enable_xiatui').addEventListener('change', function() {
+                toggleInputState('enable_xiatui', 'xiatui_key');
+            });
+        };
+
+        function toggleInputState(checkboxId, inputId) {
+            const checkbox = document.getElementById(checkboxId);
+            const input = document.getElementById(inputId);
+            input.disabled = !checkbox.checked;
+        }
+
+        function saveConfig() {
+            const remark = document.getElementById('remark').value;
+            const email = document.getElementById('email').value;
+            const phone = document.getElementById('phone').value;
+            const xiatui_key = document.getElementById('xiatui_key').value;
+            const enable_notify_email = document.getElementById('enable_notify_email').checked;
+            const enable_notify_phone = document.getElementById('enable_notify_phone').checked;
+            const enable_xiatui = document.getElementById('enable_xiatui').checked;
+
+            fetch("{{ home_url }}/api/alert/update", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    remark: remark,
+                    email: email,
+                    phone: phone,
+                    xiatui_key: xiatui_key,
+                    enable_notify_email: enable_notify_email,
+                    enable_notify_phone: enable_notify_phone,
+                    enable_xiatui: enable_xiatui
+                })
+            }).then(response => {
+                if (response.ok) {
+                    alert("设置保存成功");
+                } else {
+                    alert("设置保存失败");
+                }
+            });
+        }
+    </script>
+</body>
+</html>
+

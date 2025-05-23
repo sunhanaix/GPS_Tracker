@@ -1,0 +1,278 @@
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>{{history}}历史轨迹</title>
+    <base href="http://api.map.baidu.com/" />
+    <script src="https://api.map.baidu.com/api?v=2.0&ak={{ baidu_ak }}"></script>
+    <script src="https://api.map.baidu.com/library/DistanceTool/1.2/src/DistanceTool_min.js"></script>
+     <style type="text/css">
+      /* 添加CSS样式 */
+      #locationText {
+        position: absolute;
+        top: 10px; /* 距离顶部10像素 */
+        left: 40%;
+        transform: translateX(-50%);
+        font-size: 40px;
+        z-index:1000;
+        color: #333;
+        background-color:#b6d8f1;
+      }
+    #playButton {
+        position: absolute;
+        top: 10px; /* 距离顶部10像素 */
+        left: 90%;
+        transform: translateX(-50%);
+        font-size: 25px;
+        z-index: 1000;
+        color: #fff;
+        background-color: #007bff; /* 蓝色背景 */
+        border: none; /* 去掉边框 */
+        border-radius: 5px; /* 圆角 */
+        padding: 10px 20px; /* 内边距 */
+        cursor: pointer; /* 鼠标悬停时显示为手形 */
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* 阴影效果 */
+        transition: background-color 0.3s ease; /* 背景颜色变化过渡效果 */
+      }
+
+    #playButton:hover {
+        background-color: #0056b3; /* 悬停时背景颜色 */
+      }
+
+    #playButton:active {
+        background-color: #004085; /* 按下时背景颜色 */
+      }
+    #distanceButton {
+            position: absolute;
+            top: 10px;
+            left: 70px;
+            z-index: 1000;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            padding: 13px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    #shareButton {
+        position: absolute;
+        top: 10px; /* 距离顶部10像素 */
+        left: 70%;
+        transform: translateX(-50%);
+        font-size: 25px;
+        z-index: 1000;
+        color: #fff;
+        background-color: #28a745; /* 绿色背景 */
+        border: none; /* 去掉边框 */
+        border-radius: 5px; /* 圆角 */
+        padding: 10px 20px; /* 内边距 */
+        cursor: pointer; /* 鼠标悬停时显示为手形 */
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* 阴影效果 */
+        transition: background-color 0.3s ease; /* 背景颜色变化过渡效果 */
+    }
+
+    #shareButton:hover {
+        background-color: #218838; /* 悬停时背景颜色 */
+    }
+
+    #shareButton:active {
+        background-color: #1e7e34; /* 按下时背景颜色 */
+    }
+    </style>
+  </head>
+  
+  <body>
+  <div id="playButton" onclick="playTrack()">播放轨迹</div>
+  <div id="locationText">当前轨迹共计{{distance}}米</div>
+  <button id="distanceButton">测距</button>
+  <div id="shareButton" onclick="shareTrack()">分享轨迹</div>
+  <div style="width:100%;height:100%;border:#ccc solid 1px;font-size:12px" id="map"></div>
+</body>
+  <script type="text/javascript">
+    /* 从服务器获取的物体运动轨迹数据 */
+    var trackData ={{ data | safe }};  //假设trackData是一个包含轨迹数据都已经是百度坐标系了
+
+    // 检查trackData是否为空
+    if (trackData.length === 0) {
+        // 如果trackData为空，显示提示信息
+        document.getElementById("locationText").innerText = "未获得此时间范围内的定位器行进轨迹，请重新调整需要查看轨迹的时间范围";
+        document.getElementById("playButton").style.display = "none"; // 隐藏播放按钮
+        document.getElementById("distanceButton").style.display = "none"; // 隐藏测距按钮
+    } else {
+        // 如果trackData不为空，继续执行原有逻辑
+        var map = new BMap.Map("map"); // 使用百度地图API创建地图实例
+        // 定义一个包含所有坐标点的Bounds对象
+        var bounds = new BMap.Bounds();
+        // 将坐标点添加到Bounds对象中
+        for (var i = 0; i < trackData.length; i++) {
+            var point = new BMap.Point(parseFloat(trackData[i].lng), parseFloat(trackData[i].lat));
+            bounds.extend(point);
+        }
+        // 调整地图视野以包含所有坐标点
+        map.setViewport(bounds);
+        var zoomLevel = map.getZoom();    
+        map.centerAndZoom(map.getCenter(), zoomLevel);
+        map.enableScrollWheelZoom();
+        map.enableKeyboard();
+        map.enableDragging();
+        //向地图添加控件
+        var scaleControl = new BMap.ScaleControl({anchor:BMAP_ANCHOR_BOTTOM_LEFT});
+        scaleControl.setUnit(BMAP_UNIT_IMPERIAL);
+        map.addControl(scaleControl);
+        var navControl = new BMap.NavigationControl({anchor:BMAP_ANCHOR_TOP_LEFT,type:0});
+        map.addControl(navControl);
+        // 添加测距控件
+        var distanceTool = new BMapLib.DistanceTool(map);
+        document.getElementById("distanceButton").addEventListener("click", function() {
+            distanceTool.open();
+        });
+        for (var i = 0; i < trackData.length; i++) {
+            var point = new BMap.Point(trackData[i].lng, trackData[i].lat);
+            var marker = new BMap.Marker(point);
+            if(i==0){
+                var txtLabel = "起:"+trackData[i].pt;
+            }
+            else if (i === trackData.length - 1) {
+                var txtLabel = "终:"+trackData[i].pt+"<br>当前轨迹共计{{distance}}米";
+            }
+            else{
+                var txtLabel = trackData[i].pt;
+            }
+            var label = new BMap.Label(txtLabel, {
+                offset: new BMap.Size(20, -10),
+            });
+            label.setStyle({ color: "red",  fontSize: "16px" });  // 自定义字体大小
+            marker.setLabel(label);
+            marker.setZIndex(1000 + i); // 设置zIndex，确保后面的轨迹点在前面的轨迹点之上
+            map.addOverlay(marker);
+        }
+        var polylinePoints = []; // 用于存储轨迹点坐标
+        for (var i = 0; i < trackData.length; i++) {
+            var point = new BMap.Point(trackData[i].lng, trackData[i].lat);
+            polylinePoints.push(point);
+        }
+        var polyline = new BMap.Polyline(polylinePoints, { strokeColor: "blue", strokeWeight: 3, strokeOpacity: 0.5 });
+        map.addOverlay(polyline);
+        function playTrack() {
+            map.clearOverlays(); // 清除屏幕上的所有覆盖物
+            var index = 0;
+            var totalDistance = 0; // 用于累计总距离
+
+            function addPoint() {
+                if (index >= trackData.length) return;
+
+                var point = new BMap.Point(trackData[index].lng, trackData[index].lat);
+                var marker = new BMap.Marker(point);
+
+                var txtLabel = "";
+                if (index == 0) {
+                    txtLabel = "起:" + trackData[index].pt;
+                } else if (index === trackData.length - 1) {
+                    txtLabel = "终:" + trackData[index].pt + "<br>当前轨迹共计{{ distance }}米";
+                } else {
+                    txtLabel = trackData[index].pt;
+                }
+
+                var label = new BMap.Label(txtLabel, {
+                    offset: new BMap.Size(20, -10),
+                });
+                label.setStyle({color: "red", fontSize: "16px"});  // 自定义字体大小
+                marker.setLabel(label);
+                marker.setZIndex(1000 + index); // 设置zIndex，确保后面的轨迹点在前面的轨迹点之上
+                map.addOverlay(marker);
+
+                if (index > 0) {
+                    var prevPoint = new BMap.Point(trackData[index - 1].lng, trackData[index - 1].lat);
+                    var polyline = new BMap.Polyline([prevPoint, point], {
+                        strokeColor: "blue",
+                        strokeWeight: 3,
+                        strokeOpacity: 0.5
+                    });
+                    map.addOverlay(polyline);
+
+                    // 计算当前点与前一个点的距离，并累加到总距离中
+                    var distance = map.getDistance(prevPoint, point);
+                    totalDistance += distance;
+
+                    // 更新 locationText 的文本内容
+                    document.getElementById("locationText").innerText = "当前轨迹共计" + Math.round(totalDistance) + "米";
+                }
+
+                index++;
+                setTimeout(addPoint, 500); // 每隔1秒显示一个轨迹点
+            }
+
+            addPoint();
+        }
+        // 根据 his 变量的值设置分享轨迹按钮的状态，如果为空，也隐藏
+        var his = {{ his |  default(0) | safe }}; // 获取 his 变量的值
+        if (his === 1 || his === true || his === "1") {
+            document.getElementById("shareButton").style.display = "block"; // 显示分享按钮
+        } else {
+            document.getElementById("shareButton").style.display = "none"; // 隐藏分享按钮
+        }
+    }
+</script>
+
+<script>
+    function shareTrack() {
+    // 获取当前页面的轨迹时间范围
+    var startTime = "{{ history.split('--')[0] }}"; // 从模板变量中获取开始时间
+    var endTime = "{{ history.split('--')[1] }}";   // 从模板变量中获取结束时间
+
+    // 调用后台API生成分享链接
+    fetch('{{ home_url }}/api/share/track', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            start_time: startTime,
+            end_time: endTime
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === "success") {
+            // 拼接分享链接并提示用户
+            var shareLink = "{{ home_url }}/sharetrack/" + data.md5;
+            // 复制到剪贴板
+            navigator.clipboard.writeText(shareLink).then(() => {
+                alert("分享链接已生成，并已复制到剪贴板:\n" + shareLink);
+            }).catch(err => {
+                console.error('复制失败:', err);
+                alert("分享链接已生成，请手动复制:\n" + shareLink);
+            });
+        } else {
+            alert("生成分享链接失败: " + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert("生成分享链接时发生错误");
+    });
+}
+</script>
+
+<script>
+  function adjustMapCenterAndZoom() {
+  // 获取当前地图的中心点
+  var center = map.getCenter();
+
+  // 获取当前地图的缩放级别
+  var zoom = map.getZoom();
+
+  // 调整地图视野以包含所有坐标点（使用你之前计算边界的方式）
+  // 假设你有一个名为 bounds 的 Bounds 对象
+  map.setViewport(bounds);
+
+  // 设置地图的中心点和缩放级别
+
+  map.centerAndZoom(center, zoom);
+}
+window.addEventListener('resize', function() {
+  // 在页面大小变化时执行地图的居中缩放逻辑
+  console.log("found resize event")
+    adjustMapCenterAndZoom();
+});
+</script>
+</html>
